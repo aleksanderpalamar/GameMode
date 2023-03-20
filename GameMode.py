@@ -2,6 +2,7 @@ import subprocess
 import platform
 import psutil
 import nvidia_smi
+import os
 
 steam_cmd = "steam -bigpicture"
 name = "steam.exe" if platform.system() == "Windows" else "steam"
@@ -60,18 +61,35 @@ def is_steam_running():
         False,
     )
 
+def active_feral_gamemode():
+    if os.path.isfile("/usr/bin/gamemoderun"):
+        os.system("gamemoderun steam -bigpicture")
 
-def set_game_mode():
-    nvidia_smi.nvmInit()
+
+def set_game_mode():  # sourcery skip: extract-method
+    nvidia_smi.nvmlInit()
     handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-    clock_freqs = nvidia_smi.nvmlDeviceGetClockInfo(
-        handle, nvidia_smi.NVML_CLOCK_GRAPHICS
-    )
-    current_freq = clock_freqs["current"]
-    target_freq = int(current_freq * 1.05)
-    command = f"nvidia-smi -ac {target_freq},{target_freq-100}"
-    subprocess.run
+    pci_info = nvidia_smi.nvmlDeviceGetPciInfo(handle)
+    if pci_info.busId == "0000:01:00.0":
+        power_limit = 90  # power limit in watts
+        memory_clock = 7500  # memory clock in MHz
+        graphics_clock = 1740  # graphics clock in MHz
+        device_uuid = nvidia_smi.nvmlDeviceGetUUID(handle)
+        command = f"nvidia-smi -i 0 -ac {memory_clock},{graphics_clock} -pl {power_limit} -g {device_uuid}"
+        subprocess.run(command, shell=True)
+
+def main():
+    if has_dedicated_gpu():
+        if is_game_running():
+            if platform.system() == "Windows":
+                set_game_mode()
+            elif platform.system() == "Linux":
+                active_feral_gamemode()
+        elif is_steam_running():
+            if platform.system() == "Windows":
+                set_game_mode()
+            elif platform.system() == "Linux":
+                active_feral_gamemode()
 
 
 subprocess.run(steam_cmd, shell=True)
-
